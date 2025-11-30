@@ -1,22 +1,14 @@
 const express = require('express');
 const cors = require('cors');
-const { Pool } = require('pg');
+const pool = require('./dbpool');  // ✅ USE SHARED POOL
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "naruto_db",
-  password: "TODOGROUPID2",
-  port: 5432
-});
-
 const GAME_STATE_ID = 1;
 
-/* TASK ENDPOINTS*/
+/* TASK ENDPOINTS */
 
 // GET all tasks
 app.get('/tasks', async (req, res) => {
@@ -53,7 +45,6 @@ app.put('/tasks/:id', async (req, res) => {
   const { name, priority, duedate, completed } = req.body;
 
   try {
-    // Check previous completion
     const prev = await pool.query('SELECT completed FROM tasks WHERE id=$1', [id]);
     if (!prev.rows.length) return res.status(404).send("Task not found");
     const wasCompleted = prev.rows[0].completed;
@@ -65,7 +56,6 @@ app.put('/tasks/:id', async (req, res) => {
       [name, priority, duedate, completed, id]
     );
 
-    // Update gamestate on newly completed task
     if (!wasCompleted && completed) {
       await pool.query(
         `UPDATE gamestate
@@ -142,17 +132,6 @@ app.post('/gamestate', async (req, res) => {
     equipped_skin_id
   } = req.body;
 
-  // Default values
-  if (player_progress_percentage === undefined) player_progress_percentage = 50;
-  if (level_index === undefined) level_index = 0;
-  if (opponent_index === undefined) opponent_index = 0;
-  if (current_streak === undefined) current_streak = 0;
-  if (total_completed_missions === undefined) total_completed_missions = 0;
-  if (xp === undefined) xp = 0;
-  if (level === undefined) level = 1;
-  if (is_immune === undefined) is_immune = false;
-  if (!rewards_state) rewards_state = [];
-  if (!shop_items) shop_items = [];
   if (!equipped_skin_id) equipped_skin_id = 'default';
 
   try {
