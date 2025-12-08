@@ -7,15 +7,16 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  user: naruto_missions_db_user,
-  host: dpg-d4r97mqli9vc73a9kod0-a,
-  database: naruto_missions_db,
-  password: tzLUy6bZQvoAQY8z3tjvbC21rUGW7c11,
-  port: 5432,
-   ssl: {
+  user: process.env.DB_USER,
+  host: process.env.DB_HOST,
+  database: process.env.DB_NAME,
+  password: process.env.DB_PASSWORD,
+  port: process.env.DB_PORT || 5432,
+  ssl: {
     rejectUnauthorized: false,
   }
 });
+
 
 const GAME_STATE_ID = 1;
 
@@ -220,6 +221,7 @@ app.post('/gamestate', async (req, res) => {
 });
 
 /* START SERVER */
-app.listen(3000, () => {
-  console.log("Ultimate NarutoDB backend running on port 3000");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("Server running on port " + PORT);
 });
