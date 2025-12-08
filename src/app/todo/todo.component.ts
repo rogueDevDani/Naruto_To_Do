@@ -1,64 +1,69 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { TodoService } from './todo.service';
+import { firstValueFrom } from 'rxjs';
 
-type Priority = 'low'|'medium'|'high';
+interface GameState {
+  level_index: number;
+  opponent_index: number;
+  player_progress_percentage: number;
+  xp: number;
+  level: number;
+  current_streak: number;
+  total_completed_missions: number;
+  is_immune: boolean;
+  rewards_state: { id: number; unlocked: boolean }[];
+  shop_items: { id: string; owned: boolean }[];
+}
+
+type Priority = 'D' | 'C' | 'B' | 'A' | 'S';
+
 type Task = {
   id: number;
   name: string;
   priority: Priority;
   dueDate?: string;
   completed: boolean;
-  editing?: boolean; // Used to show/hide edit fields
+  editing?: boolean;
 };
 
 type Reward = {
   id: number;
   name: string;
-  milestone: number; // Cumulative tasks completed across all time
+  milestone: number;
   unlocked: boolean;
   description: string;
   effect: string;
 };
 
-// ** USER-DEFINED OPPONENT LIST **
-const OPPONENTS = [
-  'Mizuki', 'Kabuto', 'Zabuza', 'Neji', 'Gaara', 
-  'Kakuzu', 'Pain', 'Obito', 'Madara', 'Kaguya' 
+type ShopItem = {
+  id: string;
+  displayName: string;
+  fileName: string;
+  cost: number;
+  owned?: boolean;
+};
+
+const LEVEL_OPPONENTS: { name: string }[][] = [
+  [{ name: 'Mizuki' }, { name: 'Zabuza' }],
+  [{ name: 'Neji' }, { name: 'Gaara' }],
+  [{ name: 'Kabuto' }, { name: 'Kakuzu' }],
+  [{ name: 'Pain' }, { name: 'Obito' }],
+  [{ name: 'Madara' }, { name: 'Kaguya' }]
 ];
 
-// Define the default rewards array structure
 const DEFAULT_REWARDS: Reward[] = [
-    { id: 1, name: 'Enhanced Kunai', milestone: 10, unlocked: false, 
-      description: 'Naruto throws better kunai.',
-      effect: 'Permanently increases Low Priority task damage by 2 HP (New Low: 22).' },
-    { id: 2, name: 'Shadow Clone Training', milestone: 25, unlocked: false, 
-      description: 'Efficient learning by using clones.',
-      effect: 'Unlocks Shadow Clone Reward: Every 5-Task streak now grants a bonus 10 XP on the next task.' },
-    { id: 3, name: 'Chakra Control Mastery', milestone: 50, unlocked: false, 
-      description: 'Better chakra flow reduces wasted energy.',
-      effect: 'Permanently reduces player loss on unchecked tasks from 3% to 1%.' },
-    { id: 4, name: 'Nine-Tails Chakra Buff', milestone: 75, unlocked: false, 
-      description: 'Gain a temporary chakra boost from Kurama.',
-      effect: 'Unlocks Nine-Tails Reward: Every 5-Task streak now grants 1-Mission Immunity.' },
-    { id: 5, name: 'Rasengan Optimization', milestone: 100, unlocked: false, 
-      description: 'A more focused Rasengan.',
-      effect: 'Permanently increases Medium Priority task damage by 5 HP (New Med: 45).' },
-    { id: 6, name: 'Sage Mode Skin/Buff', milestone: 150, unlocked: false, 
-      description: 'Naruto unlocks the power of the Sages! (Cosmetic + Buff)',
-      effect: 'Permanently increases High Priority task damage by 10 HP (New High: 70).' },
-    { id: 7, name: 'Hokage Foresight', milestone: 200, unlocked: false, 
-      description: 'The foresight of a Kage protects you from minor lapses.',
-      effect: 'Permanently reduces enemy damage on overdue tasks from 5% to 4%.' },
-    { id: 8, name: 'Wind Release Mastery', milestone: 300, unlocked: false, 
-      description: 'Wind chakra enhances speed and focus.',
-      effect: 'All task damage is permanently increased by an additional 2 HP.' },
-    { id: 9, name: 'Jinchuriki Healing', milestone: 400, unlocked: false, 
-      description: 'Kurama’s natural healing rate.',
-      effect: 'Player is healed 5% progress upon defeating an opponent (Base win heal is now 15%).' },
-    { id: 10, name: 'Six Paths Power', milestone: 500, unlocked: false, 
-      description: 'A legendary level of power.',
-      effect: 'Permanently reduces enemy damage on overdue tasks to 2%.' }
+  { id: 1, name: 'Enhanced Kunai', milestone: 10, unlocked: false, description: 'Naruto throws better kunai.', effect: 'Permanently increases D-Rank task damage by 2 HP (New D: 12).' },
+  { id: 2, name: 'Shadow Clone Training', milestone: 25, unlocked: false, description: 'Efficient learning by using clones.', effect: 'Every 5-Task streak grants 10 bonus XP.' },
+  { id: 3, name: 'Chakra Control Mastery', milestone: 50, unlocked: false, description: 'Better chakra flow reduces wasted energy.', effect: 'Reduces player loss on unchecked tasks from 3% to 1%.' },
+  { id: 4, name: 'Nine-Tails Chakra Buff', milestone: 75, unlocked: false, description: 'Temporary chakra boost from Kurama.', effect: 'Every 5-Task streak grants 1-Mission Immunity.' },
+  { id: 5, name: 'Rasengan Optimization', milestone: 100, unlocked: false, description: 'A more focused Rasengan.', effect: 'Increases B-Rank task damage by 5 HP (New B: 35).' },
+  { id: 6, name: 'Sage Mode Skin/Buff', milestone: 150, unlocked: false, description: 'Naruto unlocks the power of the Sages! (Cosmetic + Buff)', effect: 'Increases A-Rank task damage by 10 HP (New A: 50).' },
+  { id: 7, name: 'Hokage Foresight', milestone: 200, unlocked: false, description: 'Foresight of a Kage protects you.', effect: 'Reduces overdue task damage from 5% to 4%.' },
+  { id: 8, name: 'Wind Release Mastery', milestone: 300, unlocked: false, description: 'Wind chakra enhances speed and focus.', effect: 'All task damage +2 HP.' },
+  { id: 9, name: 'Jinchuriki Healing', milestone: 400, unlocked: false, description: 'Kurama’s healing rate.', effect: 'Player heals 5% progress upon defeating an opponent (Base win heal now 15%).' },
+  { id: 10, name: 'Six Paths Power', milestone: 500, unlocked: false, description: 'Legendary power.', effect: 'Reduces overdue task damage to 2%.' }
 ];
 
 @Component({
@@ -69,47 +74,52 @@ const DEFAULT_REWARDS: Reward[] = [
   styleUrls: ['./todo.component.css']
 })
 export class TodoComponent implements OnInit {
-  // form
+  // --- Form & UI ---
+  constructor(private todoService: TodoService) {}
   newTask = '';
   newDueDate = '';
-  priority: Priority = 'low';
+  priority: Priority = 'D';
+  newPriority: string = 'D'; 
+  showRewardsOverlay = false;
+  showShopOverlay = false;
 
-  // tasks
+  // --- Tasks ---
   tasks: Task[] = [];
 
-  showRewardsOverlay = false;
+  // --- Shop ---
+  shopItems: ShopItem[] = [
+  { id: 'default', displayName: 'Default Naruto', fileName: 'naruto_sprite.png', cost: 0, owned: true },
+  { id: 'sage', displayName: 'Sage Mode Naruto', fileName: 'naruto_sage_sprite.PNG', cost: 10 },
+  { id: 'kurama', displayName: 'Kurama Cloak Naruto', fileName: 'naruto_kurama_sprite.PNG', cost: 20 },
+  { id: 'hokage', displayName: 'Hokage Naruto', fileName: 'naruto_hokage_sprite.PNG', cost: 30 },
+  { id: 'sage_necklace', displayName: 'Sage Necklace', fileName: 'sage_necklace.PNG', cost: 5 },
+  { id: 'hokage_hat', displayName: 'Hokage Hat', fileName: 'hokage_hat.PNG', cost: 8 },
+  { id: 'anbu_mask', displayName: 'ANBU Black Ops Mask', fileName: 'anbu_mask.PNG', cost: 12 }
+];
+  equippedSkinId = 'default';
 
-  get completedTasksCount(): number {
-    return this.tasks.filter(t => t.completed).length;
-  }
-  
-  // ** TUG-OF-WAR LOGIC **
-  levelIndex = 0; 
-  playerProgressPercentage = 50; 
-  
-  // ** GAME CONSTANTS **
-  damageValues = { low: 20, medium: 40, high: 60 };
-  hpToProgressRatio = 2;
+  // --- Game State ---
+  levelIndex = 0;
+  currentOpponentIndex = 0;
+  playerProgressPercentage = 50;
+
+  damageValues = { D: 10, C: 20, B: 30, A: 40, S: 50 };
   opponentDamageLoss = 5;
-  
   uncheckLoss = 3;
   winHealGain = 10;
 
-  // xp/level-ish display
   xp = 0;
   level = 1;
 
-  // Streak Reward Logic
   currentStreak = 0;
-  totalCompletedMissions = 0; // Cumulative count
+  totalCompletedMissions = 0;
   isImmune = false;
-  
-  rewards: Reward[] = DEFAULT_REWARDS;
 
-  // Reminder logic remains the same
-  reminderTimerFirstMs = 60 * 1000; 
-  reminderIntervalMs = 1.5 * 60 * 60 * 1000; 
-  
+  rewards: Reward[] = DEFAULT_REWARDS.map(r => ({ ...r }));
+
+  // --- Reminder ---
+  reminderTimerFirstMs = 1 * 60 * 1000;
+  reminderIntervalMs = 30 * 60 * 1000;
   reminderMessages = [
     '💧 Hydration Mission: Please drink your water!',
     '🍜 Fuel Check: Please eat your food or have a snack.',
@@ -119,69 +129,103 @@ export class TodoComponent implements OnInit {
     '🧠 Chakra Regeneration: Take a 5-minute mental break.'
   ];
 
-  // animation state
+  // --- Animation & Popup ---
   showAttack = false;
-  attackGifUrl = ''; 
+  attackGifUrl = '';
   attackText = '';
-  
   popupText = '';
 
-  constructor(){}
-
-  ngOnInit(){
-    this.load();
-    this.applyPermanentEffects(); // Apply effects on load
+  ngOnInit() {
+    this.loadFromBackend();
+    this.applyPermanentEffects();
     this.updateDerived();
-    
-    // schedule reminders
-    setTimeout(()=> this.randomReminder(), this.reminderTimerFirstMs);
-    setInterval(()=> this.randomReminder(), this.reminderIntervalMs);
+    this.loadOpponentForLevel();
 
-    // Check for overdue tasks hourly
-    setInterval(() => this.checkOverdueTasks(), 60 * 60 * 1000); 
+    setTimeout(() => this.randomReminder(), this.reminderTimerFirstMs);
+    setInterval(() => this.randomReminder(), this.reminderIntervalMs);
+    setInterval(() => this.checkOverdueTasks(), 60 * 60 * 1000);
   }
 
+  // ---------------- Opponent / Level ----------------
+  loadOpponentForLevel(): void {
+    const opponents = LEVEL_OPPONENTS[this.levelIndex] || [];
+    if (!opponents.length) return;
+    if (this.currentOpponentIndex < 0 || this.currentOpponentIndex >= opponents.length) {
+      this.currentOpponentIndex = Math.floor(Math.random() * opponents.length);
+    }
+    this.save();
+  }
+
+  get currentOpponentName(): string {
+    const opponents = LEVEL_OPPONENTS[this.levelIndex] || [];
+    return opponents[this.currentOpponentIndex]?.name ?? '—';
+  }
+
+  get currentOpponentImage(): string {
+    return `/${this.currentOpponentName.toLowerCase()}_sprite.png`;
+  }
+
+  // ---------------- Shop ----------------
+  toggleShopOverlay(): void { this.showShopOverlay = !this.showShopOverlay; }
+
+  get currentPlayerImage(): string {
+    return this.shopItems.find(s => s.id === this.equippedSkinId)?.fileName || 'naruto_sprite.png';
+  }
+
+  buyOrEquipSkin(itemId: string) {
+    const item = this.shopItems.find(s => s.id === itemId);
+    if (!item) return;
+
+    if (item.owned) {
+      this.equippedSkinId = item.id;
+      this.triggerPopup(`✅ Equipped ${item.displayName}`);
+    } else if (this.currentStreak >= item.cost) {
+      this.currentStreak -= item.cost;
+      item.owned = true;
+      this.equippedSkinId = item.id;
+      this.triggerPopup(`🛒 Purchased & equipped ${item.displayName} for ${item.cost} streak(s).`);
+    } else {
+      this.triggerPopup(`❌ Not enough streaks to buy ${item.displayName}. Need ${item.cost}.`);
+    }
+    this.save();
+  }
+
+  // ---------------- Popups & Reminder ----------------
   triggerPopup(text: string, duration = 3000): void {
     this.popupText = text;
-    setTimeout(() => {
-      this.popupText = '';
-    }, duration);
+    setTimeout(() => this.popupText = '', duration);
   }
 
   randomReminder(): void {
-    const randomIndex = Math.floor(Math.random() * this.reminderMessages.length);
-    this.triggerPopup(this.reminderMessages[randomIndex]);
+    const idx = Math.floor(Math.random() * this.reminderMessages.length);
+    this.triggerPopup(this.reminderMessages[idx]);
   }
 
   toggleRewardsOverlay(): void {
-    this.showRewardsOverlay = !this.showRewardsOverlay;
-  }
+  this.showRewardsOverlay = !this.showRewardsOverlay;
+}
 
-  // Helper to re-calculate damage and passive effects based on unlocked rewards
+
+  // ---------------- Rewards ----------------
   applyPermanentEffects(): void {
-    let lowDmg = 20; let mediumDmg = 40; let highDmg = 60;
-    let overdueDmg = 5;
-    let uncheckLoss = 3;
-    let winHeal = 10;
+    let D = 10, C = 20, B = 30, A = 40, S = 50;
+    let overdueDmg = 5, uncheckLoss = 3, winHeal = 10;
 
-    // Apply all unlocked permanent rewards
     this.rewards.forEach(r => {
-        if (r.unlocked) {
-            switch (r.id) {
-                case 1: lowDmg += 2; break; // Enhanced Kunai
-                case 3: uncheckLoss = 1; break; // Chakra Control Mastery
-                case 5: mediumDmg += 5; break; // Rasengan Optimization
-                case 6: highDmg += 10; break; // Sage Mode
-                case 7: overdueDmg = Math.min(overdueDmg, 4); break; // Hokage Foresight
-                case 8: lowDmg += 2; mediumDmg += 2; highDmg += 2; break; // Wind Release Mastery
-                case 9: winHeal = 15; break; // Jinchuriki Healing
-                case 10: overdueDmg = Math.min(overdueDmg, 2); break; // Six Paths Power
-            }
-        }
+      if (!r.unlocked) return;
+      switch (r.id) {
+        case 1: D += 2; break;
+        case 3: uncheckLoss = 1; break;
+        case 5: B += 5; break;
+        case 6: A += 10; break;
+        case 7: overdueDmg = Math.min(overdueDmg, 4); break;
+        case 8: D += 2; C += 2; B += 2; A += 2; S += 2; break;
+        case 9: winHeal = 15; break;
+        case 10: overdueDmg = Math.min(overdueDmg, 2); break;
+      }
     });
 
-    // Apply calculated values
-    this.damageValues = { low: lowDmg, medium: mediumDmg, high: highDmg };
+    this.damageValues = { D, C, B, A, S };
     this.opponentDamageLoss = overdueDmg;
     this.uncheckLoss = uncheckLoss;
     this.winHealGain = winHeal;
@@ -197,64 +241,97 @@ export class TodoComponent implements OnInit {
     });
   }
 
-  // ----- tasks -----
-  addTask(){
-    if (!this.newTask.trim()) return;
-    const t:Task = {
-      id: Date.now(),
-      name: this.newTask.trim(),
-      priority: this.priority,
-      dueDate: this.newDueDate || undefined,
-      completed: false
-    };
-    this.tasks.unshift(t);
-    this.newTask=''; this.newDueDate=''; this.priority='low';
-    this.save(); this.updateDerived();
+  // ---------------- Tasks ----------------
+async addTask() {
+  if (!this.newTask || !this.newTask.trim()) return;
+
+  const body = {
+    name: this.newTask.trim(),
+    priority: this.newPriority || 'D',   // ✅ ensure priority always exists
+    duedate: this.newDueDate || null,
+    completed: false
+  };
+
+  try {
+    const created = await firstValueFrom(this.todoService.createTask(body));
+
+    // Push new task into UI
+    this.tasks.unshift({
+      id: created.id,
+      name: created.name,
+      priority: created.priority,
+      dueDate: created.duedate,   // ✅ FIX PROPERTY NAME
+      completed: created.completed
+    });
+  } catch (err) {
+    console.error('Error creating task:', err);
   }
 
-  editTask(t:Task){
-    // FIX: Toggling the flag is correct. HTML must reveal the edit fields.
-    t.editing = !t.editing;
-    this.save(); // Save after toggling, useful for persistence
+  // Reset input fields
+  this.newTask = '';
+  this.newDueDate = '';
+  this.newPriority = 'D';  // ✅ FIXED: reset the same variable you send
+
+  // Optional: only run these if they don't break UI
+  this.save?.();
+  this.updateDerived?.();
+}
+
+
+  editTask(t: Task) { t.editing = !t.editing; this.save(); }
+  async saveEdit(t: Task) {
+  try {
+    await firstValueFrom(this.todoService.updateTask(t.id, {
+      name: t.name,
+      priority: t.priority,
+      duedate: t.dueDate || null,
+      completed: t.completed
+    }));
+  } catch (err) {
+    console.error('Error updating task:', err);
   }
 
-  // FIX: This function now also untoggles the editing flag explicitly
-  saveEdit(t:Task){ 
-    t.editing=false; 
-    // Ensure data binding has updated the object before saving
-    this.save(); 
-    this.updateDerived(); 
-  }
-  
-  // FIX: Cancel Edit function added for completeness
-  cancelEdit(t:Task) {
-    t.editing = false;
+  t.editing = false;
+  await firstValueFrom(this.todoService.updateTask(t.id, {
+  name: t.name,
+  priority: t.priority,
+  duedate: t.dueDate || null,
+  completed: t.completed
+}));
+
+this.save();
+
+  this.updateDerived();
+}
+
+  cancelEdit(t: Task) { t.editing = false; this.save(); }
+  async removeTask(id: number) {
+  try {
+    await firstValueFrom(this.todoService.deleteTask(id));
+    this.tasks = this.tasks.filter(t => t.id !== id);
     this.save();
+    this.updateDerived();
+  } catch (err) {
+    console.error('Error deleting task:', err);
   }
+}
 
-  removeTask(id:number){
-    this.tasks = this.tasks.filter(x => x.id !== id);
-    this.save(); this.updateDerived();
-  }
 
-  toggleComplete(t:Task){
+  toggleComplete(t: Task) {
     setTimeout(() => {
       if (t.completed) {
-        // TASK COMPLETED: Player gains progress
-        const damageHP = this.damageForPriority(t.priority);
-        const progressGain = damageHP / this.hpToProgressRatio;
+        const progressGain = this.damageForPriority(t.priority) / 2;
         this.attackOpponent(progressGain);
         this.gainXP(Math.round(progressGain));
-        this.totalCompletedMissions++; // Increment total cumulative count
+        this.totalCompletedMissions++;
         this.updateCurrentStreak(true);
         this.checkForRewards();
       } else {
-        // TASK UNCHECKED: Player loses progress (Uses dynamic uncheckLoss)
-        this.playerProgressPercentage = Math.max(0, this.playerProgressPercentage - this.uncheckLoss); 
+        this.playerProgressPercentage = Math.max(0, this.playerProgressPercentage - this.uncheckLoss);
         this.triggerPopup(`📉 Unchecked task! You lost ${this.uncheckLoss}% control.`);
         this.updateCurrentStreak(false);
       }
-      this.save(); 
+      this.save();
       this.updateDerived();
     }, 0);
   }
@@ -266,14 +343,8 @@ export class TodoComponent implements OnInit {
     if (isCompleted) {
       this.currentStreak++;
       if (this.currentStreak % 5 === 0) {
-        if (shadowClone) {
-          this.gainXP(10);
-          this.triggerPopup(`✨ Shadow Clone Bonus: Naruto gained 10 bonus XP!`);
-        }
-        if (chakraBuff) {
-          this.isImmune = true;
-          this.triggerPopup(`✨ Chakra Surge: Naruto gained 1-Mission Immunity!`);
-        }
+        if (shadowClone) { this.gainXP(10); this.triggerPopup('✨ Shadow Clone Bonus: +10 XP!'); }
+        if (chakraBuff) { this.isImmune = true; this.triggerPopup('✨ Chakra Surge: 1-Mission Immunity!'); }
       }
     } else {
       this.currentStreak = 0;
@@ -281,66 +352,55 @@ export class TodoComponent implements OnInit {
     }
   }
 
-  checkOverdueTasks(){
+  checkOverdueTasks(): void {
     const today = new Date().toISOString().split('T')[0];
-    let tasksOverdue = 0;
-    
-    this.tasks.forEach(t => {
-      if (!t.completed && t.dueDate && t.dueDate < today && !t.editing) {
-        tasksOverdue++; 
-      }
-    });
+    const overdueTasks = this.tasks.filter(t => !t.completed && t.dueDate && t.dueDate < today && !t.editing);
 
-    if (tasksOverdue > 0) {
-      if (this.isImmune) {
-        this.isImmune = false; 
-        this.triggerPopup(`🛡️ Immunity Shield blocked ${tasksOverdue} overdue mission attack!`);
-      } else {
-        const progressLoss = tasksOverdue * this.opponentDamageLoss;
-        this.playerProgressPercentage = Math.max(0, this.playerProgressPercentage - progressLoss);
-        this.triggerPopup(`💥 You missed ${tasksOverdue} mission(s)! ${this.currentOpponentName} gained ${progressLoss}% control!`);
-        this.checkOpponentDefeated(); 
-      }
-      this.currentStreak = 0;
-      this.save();
+    if (!overdueTasks.length) return;
+
+    if (this.isImmune) {
+      this.isImmune = false;
+      this.triggerPopup(`🛡️ Immunity Shield blocked ${overdueTasks.length} overdue mission attack!`);
+    } else {
+      const progressLoss = overdueTasks.length * this.opponentDamageLoss;
+      this.playerProgressPercentage = Math.max(0, this.playerProgressPercentage - progressLoss);
+      this.triggerPopup(`💥 You missed ${overdueTasks.length} mission(s)! ${this.currentOpponentName} gained ${progressLoss}% control!`);
+      this.checkOpponentDefeated();
     }
+    this.currentStreak = 0;
+    this.save();
   }
 
-  damageForPriority(p:Priority){
-    if (p==='low') return this.damageValues.low; 
-    if (p==='medium') return this.damageValues.medium; 
-    return this.damageValues.high; 
-  }
-  // END TUG-OF-WAR LOGIC
+  damageForPriority(p: Priority): number { return this.damageValues[p]; }
 
-  resetLevel(){
+  // ---------------- Game / Combat ----------------
+  resetLevel() {
     this.playerProgressPercentage = 50;
     this.currentStreak = 0;
     this.isImmune = false;
-    this.triggerPopup(`🔄 Battle with ${this.currentOpponentName} reset to 50/50.`);
+    this.triggerPopup(`🔄 Battle with ${this.currentOpponentName} reset.`);
     this.save();
     this.updateDerived();
   }
 
-  // FIX: Reset totalCompletedMissions and Rewards on New Game
-  startNewGame(){
+  startNewGame() {
     this.levelIndex = 0;
     this.playerProgressPercentage = 50;
-    this.tasks = []; 
+    this.tasks = [];
     this.currentStreak = 0;
-    this.totalCompletedMissions = 0; // IMPORTANT: Reset cumulative count
+    this.totalCompletedMissions = 0;
     this.isImmune = false;
-    this.rewards = DEFAULT_REWARDS.map(r => ({ ...r, unlocked: false })); // Reset rewards state
-    this.applyPermanentEffects(); // Re-apply base effects
-    
+    this.rewards = DEFAULT_REWARDS.map(r => ({ ...r }));
+    this.applyPermanentEffects();
+    this.currentOpponentIndex = Math.floor(Math.random() * LEVEL_OPPONENTS[0].length);
+    if (!this.shopItems.some(s => s.owned)) this.equippedSkinId = 'default';
     this.triggerPopup(`⚔️ New Game started! Facing ${this.currentOpponentName}.`);
     this.save();
     this.updateDerived();
   }
 
-  // ----- fight logic (rest remains the same) -----
-  attackOpponent(progressGain:number){
-    this.attackGifUrl = 'https://media.giphy.com/media/3o6ZtpxSZbQRRnwCKQ/giphy.gif'; 
+  attackOpponent(progressGain: number) {
+    this.attackGifUrl = 'https://media.giphy.com/media/3o6ZtpxSZbQRRnwCKQ/giphy.gif';
     this.attackText = `Naruto used Rasengan! Gained ${progressGain.toFixed(0)}% control!`;
     this.showAttack = true;
 
@@ -349,44 +409,34 @@ export class TodoComponent implements OnInit {
       this.showAttack = false;
       this.checkOpponentDefeated();
       this.save();
-    }, 650); 
+    }, 650);
   }
 
-  getWinProgressReset(): number {
-    return 50 + this.winHealGain; 
-  }
+  getWinProgressReset(): number { return 50 + this.winHealGain; }
 
-  checkOpponentDefeated(){
+  checkOpponentDefeated() {
     if (this.playerProgressPercentage >= 100) {
-      this.triggerPopup(`🎉 You defeated ${OPPONENTS[this.levelIndex]}!`);
+      this.triggerPopup(`🎉 You defeated ${this.currentOpponentName}!`);
       this.levelIndex++;
       this.currentStreak = 0;
       this.isImmune = false;
-      if (this.levelIndex >= OPPONENTS.length) {
-        this.triggerPopup('🏆 You defeated all opponents! Great job! Play again?');
-        this.levelIndex = OPPONENTS.length - 1;
+
+      if (this.levelIndex >= LEVEL_OPPONENTS.length) {
+        this.triggerPopup('🏆 You defeated all opponents! Play again?');
+        this.levelIndex = LEVEL_OPPONENTS.length - 1;
       }
-      this.playerProgressPercentage = this.getWinProgressReset(); 
+
+      this.currentOpponentIndex = Math.floor(Math.random() * LEVEL_OPPONENTS[this.levelIndex].length);
+      this.playerProgressPercentage = 50;
       this.save();
 
     } else if (this.playerProgressPercentage <= 0) {
-      this.triggerPopup(`💀 ${OPPONENTS[this.levelIndex]} defeated you! Resetting battle...`);
-      this.playerProgressPercentage = 50;
-      this.currentStreak = 0;
-      this.isImmune = false;
-      this.save();
+      this.triggerPopup(`💀 ${this.currentOpponentName} defeated you! Resetting battle...`);
+      this.resetLevel();
     }
   }
 
-  get currentOpponentName(): string {
-    if (this.levelIndex < 0 || this.levelIndex >= OPPONENTS.length) {
-      return '—';
-    }
-    return OPPONENTS[this.levelIndex];
-  }
-
-  // ----- XP/level -----
-  gainXP(amount:number){
+  gainXP(amount: number) {
     this.xp += amount;
     while (this.xp >= 100) {
       this.xp -= 100;
@@ -395,68 +445,84 @@ export class TodoComponent implements OnInit {
     }
   }
 
-  // ----- storage -----
-  updateDerived(){
+  updateDerived() {
     this.playerProgressPercentage = Math.min(100, Math.max(0, this.playerProgressPercentage));
     this.checkOpponentDefeated();
   }
 
-  save(){
+  // ---------------- Save / Load ----------------
+  save() {
     const obj = {
-      tasks:this.tasks,
-      levelIndex:this.levelIndex,
-      playerProgressPercentage:this.playerProgressPercentage, 
-      xp:this.xp,
-      level:this.level,
-      currentStreak: this.currentStreak, 
+      tasks: this.tasks,
+      levelIndex: this.levelIndex,
+      currentOpponentIndex: this.currentOpponentIndex,
+      playerProgressPercentage: this.playerProgressPercentage,
+      xp: this.xp,
+      level: this.level,
+      currentStreak: this.currentStreak,
       totalCompletedMissions: this.totalCompletedMissions,
       isImmune: this.isImmune,
-      rewards: this.rewards 
+      rewards: this.rewards,
+      shopItems: this.shopItems.map(s => ({ id: s.id, owned: !!s.owned })),
+      equippedSkinId: this.equippedSkinId
     };
     localStorage.setItem('naruto_todo_v2', JSON.stringify(obj));
+    this.todoService.updateGameState({
+  player_progress_percentage: this.playerProgressPercentage,
+  level_index: this.levelIndex,
+  opponent_index: this.currentOpponentIndex,
+  current_streak: this.currentStreak,
+  total_completed_missions: this.totalCompletedMissions,
+  xp: this.xp,
+  level: this.level,
+  is_immune: this.isImmune,
+  rewards_state: this.rewards.map(r => ({ id: r.id, unlocked: r.unlocked })),
+  shop_items: this.shopItems.map(s => ({ id: s.id, owned: !!s.owned })),
+  equipped_skin_id: this.equippedSkinId
+});
+
   }
 
-  load(){
-    const raw = localStorage.getItem('naruto_todo_v2');
-    if (!raw) return;
-    try {
-      const parsed = JSON.parse(raw);
-      this.tasks = parsed.tasks || [];
-      this.levelIndex = parsed.levelIndex ?? 0;
-      this.playerProgressPercentage = parsed.playerProgressPercentage ?? 50; 
-      this.xp = parsed.xp ?? 0;
-      this.level = parsed.level ?? 1;
-      this.currentStreak = parsed.currentStreak ?? 0; 
-      this.totalCompletedMissions = parsed.totalCompletedMissions ?? 0;
-      this.isImmune = parsed.isImmune ?? false;
-      
-      // Load rewards, ensuring we use default structure but keep the unlocked status
-      if (parsed.rewards) {
-        this.rewards = DEFAULT_REWARDS.map(defaultReward => {
-          const loaded = parsed.rewards.find((r: Reward) => r.id === defaultReward.id);
-          // FIX: Use the loaded unlocked status, but fallback to false if reward isn't found
-          return loaded ? { ...defaultReward, unlocked: loaded.unlocked ?? false } : defaultReward;
-        });
-      } else {
-        this.rewards = DEFAULT_REWARDS;
-      }
-      
-    } catch (e) {
-      console.warn('load error', e);
-      // Fallback to default state on load error
-      this.tasks = [];
-      this.levelIndex = 0;
-      this.playerProgressPercentage = 50;
-      this.xp = 0;
-      this.level = 1;
-      this.totalCompletedMissions = 0;
-      this.rewards = DEFAULT_REWARDS;
-      
+  async loadFromBackend() {
+  try {
+    const tasks: any[] = await firstValueFrom(this.todoService.getTasks());
+    const gs: GameState = await firstValueFrom(this.todoService.getGameState());
+
+    this.tasks = (tasks || []).map(t => ({
+  id: t.id,
+  name: t.name,
+  priority: t.priority,
+  dueDate: t.duedate,   // backend sends "duedate"
+  completed: t.completed
+}));
+
+    this.levelIndex = gs.level_index ?? 0;
+    this.currentOpponentIndex = gs.opponent_index ?? 0;
+    this.playerProgressPercentage = gs.player_progress_percentage ?? 50;
+    this.xp = gs.xp ?? 0;
+    this.level = gs.level ?? 1;
+    this.currentStreak = gs.current_streak ?? 0; 
+    this.totalCompletedMissions = gs.total_completed_missions ?? 0;
+    this.isImmune = gs.is_immune ?? false;
+
+    if (gs.rewards_state) {
+      this.rewards = DEFAULT_REWARDS.map(defaultReward => {
+        const loaded = gs.rewards_state.find((r: any) => r.id === defaultReward.id);
+        return loaded? { ...defaultReward, unlocked: loaded.unlocked ?? false } : defaultReward;
+      });
     }
+
+    if (gs.shop_items) {
+      gs.shop_items.forEach((s: any) => {
+        const item = this.shopItems.find(si => si.id === s.id);
+        if (item) item.owned = !!s.owned;
+      });
+    }
+
+    if (!this.shopItems.some(i => i.owned)) this.equippedSkinId = 'default';
+
+  } catch (error) {
+    console.error('Backend load failed:', error);
   }
-  //to switch the images on left when villian switches
-get currentOpponentImage(): string {
-  const opponentName = this.currentOpponentName.toLowerCase();
-  return `/${opponentName}_sprite.png`;
 }
 }
