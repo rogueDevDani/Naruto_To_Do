@@ -23,7 +23,7 @@ type Task = {
   id: number;
   name: string;
   priority: Priority;
-  dueDate?: string;
+  duedate?: string;
   completed: boolean;
   editing?: boolean;
 };
@@ -78,7 +78,6 @@ export class TodoComponent implements OnInit {
   constructor(private todoService: TodoService) {}
   newTask = '';
   newDueDate = '';
-  priority: Priority = 'D';
   newPriority: string = 'D'; 
   showRewardsOverlay = false;
   showShopOverlay = false;
@@ -260,7 +259,7 @@ async addTask() {
       id: created.id,
       name: created.name,
       priority: created.priority,
-      dueDate: created.duedate,   // ✅ FIX PROPERTY NAME
+      duedate: created.duedate,   // ✅ FIX PROPERTY NAME
       completed: created.completed
     });
   } catch (err) {
@@ -284,7 +283,7 @@ async addTask() {
     await firstValueFrom(this.todoService.updateTask(t.id, {
       name: t.name,
       priority: t.priority,
-      duedate: t.dueDate || null,
+      duedate: t.duedate || null,
       completed: t.completed
     }));
   } catch (err) {
@@ -295,7 +294,7 @@ async addTask() {
   await firstValueFrom(this.todoService.updateTask(t.id, {
   name: t.name,
   priority: t.priority,
-  duedate: t.dueDate || null,
+  duedate: t.duedate || null,
   completed: t.completed
 }));
 
@@ -354,7 +353,7 @@ this.save();
 
   checkOverdueTasks(): void {
     const today = new Date().toISOString().split('T')[0];
-    const overdueTasks = this.tasks.filter(t => !t.completed && t.dueDate && t.dueDate < today && !t.editing);
+    const overdueTasks = this.tasks.filter(t => !t.completed && t.duedate && t.duedate < today && !t.editing);
 
     if (!overdueTasks.length) return;
 
@@ -492,7 +491,7 @@ this.save();
   id: t.id,
   name: t.name,
   priority: t.priority,
-  dueDate: t.duedate,   // backend sends "duedate"
+  duedate: t.duedate ?? null,  // backend sends "duedate"
   completed: t.completed
 }));
 

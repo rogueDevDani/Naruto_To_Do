@@ -1,6 +1,6 @@
 <!-- Main Background Box -->
 <div class="app-wrap">
-  <div class=" card todo-box">
+  <div class="card todo-box">
 
     <!-- Title Row -->
     <div class="title-row">
@@ -97,7 +97,7 @@
             <input type="checkbox" [(ngModel)]="t.completed" (change)="toggleComplete(t)" />
             <div class="meta">
               <div [class.done]="t.completed" class="name">{{t.name}}</div>
-              <div class="small">Due: <span>{{t.dueDate || '—'}}</span></div>
+              <div class="small">Due: <span>{{t.duedate || '—'}}</span></div>
             </div>
           </div>
           <div class="right">
@@ -117,7 +117,7 @@
               <option value="A">A-Rank [Jonin]</option>
               <option value="S">S-Rank [Elite]</option>
             </select>
-            <input type="date" [(ngModel)]="t.dueDate" class="edit-date-input" />
+            <input type="date" [(ngModel)]="t.duedate" class="edit-date-input" />
           </div>
           <div class="right edit-controls">
             <button class="btn small-btn save-btn" (click)="saveEdit(t)">Save</button>
@@ -137,12 +137,12 @@
         <div class="reward-list-scroll">
           <div *ngFor="let reward of rewards" class="reward-item">
             <span [style.color]="reward.unlocked ? '#76ff03' : '#ffb347'">
-              {{ reward.unlocked ? '✅' : '🔒' }}
+              {{ reward.unlocked? '✅' : '🔒' }}
               <strong class="reward-name">{{ reward.name }}</strong>
             </span>
             <span class="milestone">({{ reward.milestone }} Missions)</span>
             <div class="effect-desc" [style.color]="reward.unlocked ? '#bdf7c9' : 'var(--muted)'">
-              {{ reward.unlocked ? reward.effect : reward.description }}
+              {{ reward.unlocked? reward.effect: reward.description }}
             </div>
           </div>
         </div>
@@ -159,7 +159,7 @@
           <div *ngFor="let item of shopItems" class="shop-item">
             <span class="shop-name">{{ item.displayName }}</span>
             <button class="btn small-btn" (click)="buyOrEquipSkin(item.id)">
-              {{ item.owned ? 'Equip' : 'Buy (' + item.cost + ')' }}
+              {{ item.owned? 'Equip' : 'Buy (' + item.cost + ')' }}
             </button>
           </div>
         </div>
