@@ -134,16 +134,25 @@ export class TodoComponent implements OnInit {
   attackText = '';
   popupText = '';
 
-  ngOnInit() {
-    this.loadFromBackend();
-    this.applyPermanentEffects();
-    this.updateDerived();
-    this.loadOpponentForLevel();
+  async ngOnInit() {
+  // 1️⃣ Wait for backend to load real values BEFORE doing anything
+  await this.loadFromBackend();
 
-    setTimeout(() => this.randomReminder(), this.reminderTimerFirstMs);
-    setInterval(() => this.randomReminder(), this.reminderIntervalMs);
-    setInterval(() => this.checkOverdueTasks(), 60 * 60 * 1000);
-  }
+  // 2️⃣ Apply rewards AFTER real gamestate is loaded
+  this.applyPermanentEffects();
+
+  // 3️⃣ Load opponent & derived values AFTER the backend data is present
+  setTimeout(() => {
+    this.loadOpponentForLevel();
+    this.updateDerived();
+  }, 0);
+
+  // 4️⃣ Start reminders (these do NOT affect gamestate)
+  setTimeout(() => this.randomReminder(), this.reminderTimerFirstMs);
+  setInterval(() => this.randomReminder(), this.reminderIntervalMs);
+  setInterval(() => this.checkOverdueTasks(), 60 * 60 * 1000);
+}
+
 
   // ---------------- Opponent / Level ----------------
   loadOpponentForLevel(): void {
@@ -246,7 +255,7 @@ async addTask() {
 
   const body = {
     name: this.newTask.trim(),
-    priority: this.newPriority || 'D',   // ✅ ensure priority always exists
+    priority: this.newPriority || 'D',
     duedate: this.newDueDate || null,
     completed: false
   };
@@ -259,7 +268,7 @@ async addTask() {
       id: created.id,
       name: created.name,
       priority: created.priority,
-      duedate: created.duedate,   // ✅ FIX PROPERTY NAME
+      duedate: created.duedate, 
       completed: created.completed
     });
   } catch (err) {
@@ -269,7 +278,7 @@ async addTask() {
   // Reset input fields
   this.newTask = '';
   this.newDueDate = '';
-  this.newPriority = 'D';  // ✅ FIXED: reset the same variable you send
+  this.newPriority = 'D'; 
 
   // Optional: only run these if they don't break UI
   this.save?.();
@@ -315,8 +324,51 @@ this.save();
   }
 }
 
+// robust toggleComplete with optimistic update + rollback and logging
+async toggleComplete(t: Task) {
+  //basic sanity check
+  if (!t || typeof t.id === 'undefined') {
+    console.error('toggleComplete: invalid task or missing id', t);
+    this.triggerPopup('⚠️ Could not update task (invalid id).');
+    return;
+  }
 
-  toggleComplete(t: Task) {
+  // the checkbox two-way binding already flipped `t.completed` before this runs.
+  const newCompleted = !!t.completed;
+  const oldCompleted = !newCompleted; // the previous state
+
+  console.log(`toggleComplete: taskId=${t.id} newCompleted=${newCompleted}`);
+
+  // Optimistically save locally (your UI already shows the change),
+  // but also persist to localStorage immediately so refresh won't wipe it
+  try {
+    this.save(); 
+  } catch (err) {
+    console.warn('toggleComplete: local save failed', err);
+  }
+
+  //Build payload using the same shape your backend expects
+  const payload = {
+    name: t.name,
+    priority: t.priority,
+    duedate: (t as any).duedate ?? null,
+    completed: newCompleted
+  };
+
+  console.log('toggleComplete: sending payload to backend', payload);
+
+  //Send to backend and await response. On failure, revert the UI and localStorage.
+  try {
+    const updated = await firstValueFrom(this.todoService.updateTask(t.id, payload));
+    console.log('toggleComplete: backend response', updated);
+
+    // Optionally reconcile fields if backend returns a normalized object
+    if (updated && typeof updated.completed !== 'undefined') {
+      t.completed = !!updated.completed;
+      (t as any).duedate = updated.duedate ?? (t as any).duedate ?? null;
+    }
+
+    // run game logic after successful confirm, so we don't double-count progress if server fails
     setTimeout(() => {
       if (t.completed) {
         const progressGain = this.damageForPriority(t.priority) / 2;
@@ -333,7 +385,19 @@ this.save();
       this.save();
       this.updateDerived();
     }, 0);
+
+  } catch (err) {
+    console.error('toggleComplete: error updating task on backend', err);
+
+    // rollback UI state and local save
+    t.completed = oldCompleted;
+    try { this.save(); } catch (e) { console.warn('toggleComplete: rollback save failed', e); }
+
+    // show error to the user
+    this.triggerPopup('❌ Failed to persist task change. Check console & network tab.');
   }
+}
+
 
   updateCurrentStreak(isCompleted: boolean): void {
     const chakraBuff = this.rewards.find(r => r.id === 4 && r.unlocked);
@@ -450,78 +514,114 @@ this.save();
   }
 
   // ---------------- Save / Load ----------------
-  save() {
-    const obj = {
-      tasks: this.tasks,
-      levelIndex: this.levelIndex,
-      currentOpponentIndex: this.currentOpponentIndex,
-      playerProgressPercentage: this.playerProgressPercentage,
-      xp: this.xp,
-      level: this.level,
-      currentStreak: this.currentStreak,
-      totalCompletedMissions: this.totalCompletedMissions,
-      isImmune: this.isImmune,
-      rewards: this.rewards,
-      shopItems: this.shopItems.map(s => ({ id: s.id, owned: !!s.owned })),
-      equippedSkinId: this.equippedSkinId
-    };
-    localStorage.setItem('naruto_todo_v2', JSON.stringify(obj));
-    this.todoService.updateGameState({
-  player_progress_percentage: this.playerProgressPercentage,
-  level_index: this.levelIndex,
-  opponent_index: this.currentOpponentIndex,
-  current_streak: this.currentStreak,
-  total_completed_missions: this.totalCompletedMissions,
-  xp: this.xp,
-  level: this.level,
-  is_immune: this.isImmune,
-  rewards_state: this.rewards.map(r => ({ id: r.id, unlocked: r.unlocked })),
-  shop_items: this.shopItems.map(s => ({ id: s.id, owned: !!s.owned })),
-  equipped_skin_id: this.equippedSkinId
-});
+async save() {
+  const gs = {
+    player_progress_percentage: this.playerProgressPercentage,
+    level_index: this.levelIndex,
+    opponent_index: this.currentOpponentIndex,
+    current_streak: this.currentStreak,
+    total_completed_missions: this.totalCompletedMissions,
+    xp: this.xp,
+    level: this.level,
+    is_immune: this.isImmune,
+    rewards_state: this. rewards.map(r => ({ id: r.id, unlocked: r.unlocked })),
+    shop_items: this.shopItems.map(s => ({ id: s.id, owned: !!s.owned })),
+    equipped_skin_id: this.equippedSkinId
+  };
 
+  localStorage.setItem("naruto_todo_v2", JSON.stringify({
+    tasks: this.tasks,
+    ...gs
+  }));
+
+  try {
+    await firstValueFrom(this.todoService.updateGameState(gs));
+    console.log("GameState saved.", gs);
+  } catch (error) {
+    console.error("SAVE FAILED:", error);
   }
+}
 
+  //load
   async loadFromBackend() {
   try {
     const tasks: any[] = await firstValueFrom(this.todoService.getTasks());
-    const gs: GameState = await firstValueFrom(this.todoService.getGameState());
+    const gs: any = await firstValueFrom(this.todoService.getGameState());
 
+    //load tasks
     this.tasks = (tasks || []).map(t => ({
-  id: t.id,
-  name: t.name,
-  priority: t.priority,
-  duedate: t.duedate ?? null,  // backend sends "duedate"
-  completed: t.completed
-}));
+      id: t.id,
+      name: t.name,
+      priority: t.priority,
+      duedate: t.duedate ?? null,
+      completed: !!t.completed
+    }));
 
+
+// Load Basic Game State Values
     this.levelIndex = gs.level_index ?? 0;
     this.currentOpponentIndex = gs.opponent_index ?? 0;
     this.playerProgressPercentage = gs.player_progress_percentage ?? 50;
     this.xp = gs.xp ?? 0;
     this.level = gs.level ?? 1;
-    this.currentStreak = gs.current_streak ?? 0; 
+    this.currentStreak = gs.current_streak ?? 0;
     this.totalCompletedMissions = gs.total_completed_missions ?? 0;
     this.isImmune = gs.is_immune ?? false;
 
-    if (gs.rewards_state) {
-      this.rewards = DEFAULT_REWARDS.map(defaultReward => {
-        const loaded = gs.rewards_state.find((r: any) => r.id === defaultReward.id);
-        return loaded? { ...defaultReward, unlocked: loaded.unlocked ?? false } : defaultReward;
-      });
+    const safeParse = (value: any): any[] => {
+      if (!value) return [];
+
+      if (Array.isArray(value)) return value;
+
+      // If DB returns string like "[{...},{...}]"
+      if (typeof value === "string") {
+        try {
+          const parsed = JSON.parse(value);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          console.warn("⚠️ JSON parsing failed:", value);
+          return [];
+        }
+      }
+
+      return [];
+    };
+
+//load rewards safely
+    const loadedRewards = safeParse(gs.rewards_state);
+
+    this.rewards = DEFAULT_REWARDS.map(r => {
+      const found = loadedRewards.find((x: any) => x.id === r.id);
+      return found
+        ? { ...r, unlocked: !!found.unlocked }
+        : { ...r };
+    });
+
+//load shop items safely
+    const loadedShop = safeParse(gs.shop_items);
+
+    loadedShop.forEach((saved: any) => {
+      const item = this.shopItems.find(i => i.id === saved.id);
+      if (item) item.owned = !!saved.owned;
+    });
+
+    // Ensure default skin exists
+    if (!this.shopItems.some(s => s.owned)) {
+      this.equippedSkinId = "default";
+    } else {
+      this.equippedSkinId = gs.equipped_skin_id ?? "default";
     }
 
-    if (gs.shop_items) {
-      gs.shop_items.forEach((s: any) => {
-        const item = this.shopItems.find(si => si.id === s.id);
-        if (item) item.owned = !!s.owned;
-      });
-    }
-
-    if (!this.shopItems.some(i => i.owned)) this.equippedSkinId = 'default';
+    console.log("Backend load complete:", {
+      progress: this.playerProgressPercentage,
+      streak: this.currentStreak,
+      tasks: this. tasks.length,
+      rewards: this.rewards,
+      shop: this.shopItems
+    });
 
   } catch (error) {
-    console.error('Backend load failed:', error);
+    console.error("❌ Backend load failed:", error);
   }
 }
 }
