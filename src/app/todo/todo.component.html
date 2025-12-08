@@ -1,30 +1,35 @@
-<!-- Main Background Box-->
+<!-- Main Background Box -->
 <div class="app-wrap">
-      <div class="card todo-box">
-            <div class="title-row">
-            <img class="leaf" src="" alt="Hidden Leaf Symbol" /> <!--Fix: NEED TO ADD HIDDEN LEAF SYMBOL BEFORE-->
-            <h2>Naruto Mission Tracker</h2>
-          </div>
+  <div class=" card todo-box">
 
-<!-- Battle Mechanics-->
-            <div class="battle">
+    <!-- Title Row -->
+    <div class="title-row">
+      <img class="leaf" src="" alt="Hidden Leaf Symbol"/>
+      <h2>Naruto Mission Tracker</h2>
+    </div>
 
-      <!--Streak-->
+    <!-- Battle Section -->
+    <div class="battle">
+      <!-- Streak Counter -->
       <div class="streak-counter">
         🔥 STREAK: <strong>{{currentStreak}}</strong>
       </div>
-      
-<div class="level-display">
-  <img src="scroll_small.png" alt="Scroll Image" class="scroll-img">
-  <div class="level-number">Level {{levelIndex + 1}}</div>
-</div>
 
-    
-      <!--Player/ oppenent battle row-->
+      <!-- Level Display -->
+      <div class="level-display">
+        <div class="scroll-image">
+          <img src="scroll_small.png" alt="Scroll Image">
+        </div>
+        <div class="level-number">
+          Level {{levelIndex + 1}}
+        </div>
+      </div>
+
+      <!-- Player vs Opponent -->
       <div class="battle-container">
         <!-- Naruto -->
         <div class="fighter-box_left-fighter">
-          <img src="naruto_sprite.png" class="fighter-img">
+          <img [src]="currentPlayerImage" class="fighter-img" alt="Naruto">
           <div class="fighter-label">Naruto</div>
         </div>
 
@@ -43,52 +48,50 @@
 
         <!-- Opponent -->
         <div class="fighter-box_right-fighter">
-          <img [src]="currentOpponentImage" [alt]="currentOpponentName" class="fighter-img"> <!--changes opponent's image when name is changed-->
-          <div class="fighter-label">{{currentOpponentName}}</div> 
+          <img [src]="currentOpponentImage" [alt]="currentOpponentName" class="fighter-img">
+          <div class="fighter-label">{{currentOpponentName}}</div>
         </div>
       </div>
 
-<!--New game and restart buttons-->
+      <!-- New game / Reset buttons -->
       <div class="battle-actions">
         <button class="btn secondary small-btn danger" (click)="startNewGame()">New Game (Lvl 1)</button>
         <button class="btn secondary small-btn" (click)="resetLevel()">Reset Battle</button>
       </div>
-         
     </div>
 
-<!--Attack Message-->
-                <div class="attack-area" *ngIf="showAttack">
-            <div class="attack-text">{{ attackText }}</div>
-            <img *ngIf="attackGifUrl" [src]="attackGifUrl" class="attack-gif" alt="Naruto Attack" />
-          </div>
+    <!-- Attack Message -->
+    <div class="attack-area" *ngIf="showAttack">
+      <div class="attack-text">{{ attackText }}</div>
+      <img *ngIf="attackGifUrl" [src]="attackGifUrl" class="attack-gif" alt="Naruto Attack" />
+    </div>
 
-<!--User Input row-->
+    <!-- User Input Row -->
+    <div class="form-row">
+      <input type="text" [(ngModel)]="newTask" placeholder="Enter your mission..." (keyup.enter)="addTask()" />
 
-            <div class="form-row">
-            <input type="text" [(ngModel)]="newTask" placeholder="Enter your mission..." />
-
-      <label> Mission Priority:
-        <select [(ngModel)]="priority">
-                  <option id="low" value="low">Low</option>
-                  <option id="medium" value="medium">Medium</option>
-                  <option id="high" value="high">High</option>
-                </select>
+      <label> Mission Rank:
+        <select [(ngModel)]="newPriority" class="priority-select">
+          <option value="D" class="rank-d">D-Rank [Novice]</option>
+          <option value="C" class="rank-c">C-Rank [Genin]</option>
+          <option value="B" class="rank-b">B-Rank [Chunin]</option>
+          <option value="A" class="rank-a">A-Rank [Jonin]</option>
+          <option value="S" class="rank-s">S-Rank [Elite]</option>
+        </select>
       </label>
-           
+
       <label>Due date:
         <input type="date" [(ngModel)]="newDueDate" class="date-input-field" placeholder="Due Date">
       </label>
+
       <button class="btn" (click)="addTask()">Add Mission</button>
-           
-         
     </div>
 
- <!--Mission lists aka user inputed tasks-->
+    <!-- Mission List -->
+    <div class="list">
+      <div *ngIf="tasks.length === 0" class="empty">No missions yet — add one to start the battle.</div>
 
-            <div class="list">
-            <div *ngIf="tasks.length===0" class="empty">No missions yet — add one to start the battle.</div>
-
-            <div class="task" *ngFor="let t of tasks" [class.editing-task]="t.editing">
+      <div class="task" *ngFor="let t of tasks" [class.editing-task]="t.editing">
         <ng-container *ngIf="!t.editing">
           <div class="left">
             <input type="checkbox" [(ngModel)]="t.completed" (change)="toggleComplete(t)" />
@@ -98,7 +101,7 @@
             </div>
           </div>
           <div class="right">
-            <div class="priority" [ngClass]="t.priority">{{t.priority | uppercase}}</div>
+            <div class="priority" [ngClass]="t.priority">{{t.priority}}-Rank</div>
             <button class="edit-btn" (click)="editTask(t)">✏️</button>
             <button class="del-btn" (click)="removeTask(t.id)">🗑️</button>
           </div>
@@ -108,9 +111,11 @@
           <div class="edit-fields-wrap">
             <input type="text" [(ngModel)]="t.name" class="edit-input" placeholder="Mission Name" />
             <select [(ngModel)]="t.priority" class="edit-select">
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="D">D-Rank [Novice]</option>
+              <option value="C">C-Rank [Genin]</option>
+              <option value="B">B-Rank [Chunin]</option>
+              <option value="A">A-Rank [Jonin]</option>
+              <option value="S">S-Rank [Elite]</option>
             </select>
             <input type="date" [(ngModel)]="t.dueDate" class="edit-date-input" />
           </div>
@@ -119,33 +124,54 @@
             <button class="btn secondary small-btn cancel-btn" (click)="cancelEdit(t)">Cancel</button>
           </div>
         </ng-container>
-             
       </div>
-          </div>
-      </div>
+    </div>
 
-<!--Rewards-->
-  <div class="rewards-overlay" *ngIf="showRewardsOverlay">
-    <button class="close-btn" (click)="toggleRewardsOverlay()">❌</button>
-    <div class="hud-title">Permanent Rewards (Milestones)</div>
-    <p class="overlay-hint">Total Completed: <strong>{{totalCompletedMissions}}</strong> Missions</p>
+    <!-- Rewards Overlay -->
+    <div class="rewards-overlay" [class.active]="showRewardsOverlay" *ngIf="showRewardsOverlay">
+      <div class="overlay-inner">
+        <button class="close-btn" (click)="toggleRewardsOverlay()">❌</button>
+        <div class="hud-title">Permanent Rewards (Milestones)</div>
+        <p class="overlay-hint">Total Completed: <strong>{{ totalCompletedMissions }}</strong> Missions</p>
 
-    <div class="reward-list-scroll">
-      <div *ngFor="let reward of rewards" class="reward-item">
-        <span [style.color]="reward.unlocked ? '#76ff03' : '#ffb347'">
-          {{ reward.unlocked ? '✅' : '🔒' }}
-          <strong class="reward-name">{{ reward.name }}</strong>
-        </span>
-        <span class="milestone">({{ reward.milestone }} Missions)</span>
-        <div class="effect-desc" [style.color]="reward.unlocked ? '#bdf7c9' : 'var(--muted)'">
-          {{ reward.unlocked ? reward.effect : reward.description }}
+        <div class="reward-list-scroll">
+          <div *ngFor="let reward of rewards" class="reward-item">
+            <span [style.color]="reward.unlocked ? '#76ff03' : '#ffb347'">
+              {{ reward.unlocked ? '✅' : '🔒' }}
+              <strong class="reward-name">{{ reward.name }}</strong>
+            </span>
+            <span class="milestone">({{ reward.milestone }} Missions)</span>
+            <div class="effect-desc" [style.color]="reward.unlocked ? '#bdf7c9' : 'var(--muted)'">
+              {{ reward.unlocked ? reward.effect : reward.description }}
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
-      <div *ngIf="showAttack && !attackGifUrl" class="popup">{{ attackText }}</div>
 
-  <button class="rewards-btn fixed-btn" (click)="toggleRewardsOverlay()">
-    📜 Rewards
-  </button>
+    <!-- Shop Overlay -->
+    <div class="shop-overlay" [class.active]="showShopOverlay" *ngIf="showShopOverlay">
+      <div class="overlay-inner">
+        <button class="close-btn" (click)="toggleShopOverlay()">❌</button>
+        <div class="hud-title">Shop</div>
+
+        <div class="shop-list-scroll">
+          <div *ngFor="let item of shopItems" class="shop-item">
+            <span class="shop-name">{{ item.displayName }}</span>
+            <button class="btn small-btn" (click)="buyOrEquipSkin(item.id)">
+              {{ item.owned ? 'Equip' : 'Buy (' + item.cost + ')' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fixed HUD Buttons -->
+    <button class="shop-btn fixed-btn" style="top:22px; right:22px;" (click)="toggleShopOverlay()">🛒 Shop</button>
+    <button class="rewards-btn fixed-btn" (click)="toggleRewardsOverlay()">📜 Rewards</button>
+
+    <!-- Optional Attack Popup -->
+    <div *ngIf="showAttack && !attackGifUrl" class="popup">{{ attackText }}</div>
+
+  </div>
 </div>
