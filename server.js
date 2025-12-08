@@ -7,11 +7,14 @@ app.use(cors());
 app.use(express.json());
 
 const pool = new Pool({
-  user: "postgres",
-  host: "localhost",
-  database: "naruto_db",
-  password: "TODOGROUPID2",
-  port: 5432
+  user: naruto_missions_db_user,
+  host: dpg-d4r97mqli9vc73a9kod0-a,
+  database: naruto_missions_db,
+  password: tzLUy6bZQvoAQY8z3tjvbC21rUGW7c11,
+  port: 5432,
+   ssl: {
+    rejectUnauthorized: false,
+  }
 });
 
 const GAME_STATE_ID = 1;
