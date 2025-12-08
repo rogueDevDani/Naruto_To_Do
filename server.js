@@ -1,129 +1,103 @@
-const express = require('express');
-const cors = require('cors');
-const { Pool } = require('pg');
+const express = require("express");
+const cors = require("cors");
+const { Pool } = require("pg");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+//database config
 const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
+  user: process.env.DB_USER || "postgres",
+  host: process.env.DB_HOST || "localhost",
+  database: process.env.DB_NAME || "naruto_db",
+  password: process.env.DB_PASSWORD || "TODOGROUPID2",
   port: process.env.DB_PORT || 5432,
-  ssl: {
-    rejectUnauthorized: false,
-  }
+  ssl: process.env.DB_HOST ? { rejectUnauthorized: false } : false
 });
-
 
 const GAME_STATE_ID = 1;
 
-/* ====================== TASK ENDPOINTS ====================== */
-
+//----------------TASKS-----------------
 // GET all tasks
-app.get('/tasks', async (req, res) => {
+app.get("/tasks", async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM tasks ORDER BY id ASC');
+    const result = await pool.query("SELECT * FROM tasks ORDER BY id ASC");
     res.json(result.rows);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error fetching tasks:", err);
     res.status(500).send("Error fetching tasks");
   }
 });
 
 // CREATE task
-app.post('/tasks', async (req, res) => {
-  let { name, priority, duedate, completed } = req.body;
-
-  // Convert empty strings to NULL for Postgres
-  if (!priority || priority === "") priority = null;
-  if (!duedate || duedate === "") duedate = null;
-  if (completed === undefined) completed = false;
-
+app.post("/tasks", async (req, res) => {
   try {
+    const { name, priority, duedate, completed } = req.body;
+
     const result = await pool.query(
       `INSERT INTO tasks (name, priority, duedate, completed)
        VALUES ($1,$2,$3,$4)
        RETURNING *`,
-      [name, priority, duedate, completed]
+      [
+        name,
+        priority || "D",
+        duedate || null,
+        completed ?? false
+      ]
     );
 
-    res.status(201).json(result.rows[0]);
+    res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error creating task:", err);
     res.status(500).send("Error creating task");
   }
 });
 
 // UPDATE task
-app.put('/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-  let { name, priority, duedate, completed } = req.body;
-
-  // Convert empty strings to NULL
-  const safePriority = (!priority || priority === "") ? null : priority;
-  const safeDueDate  = (!duedate || duedate === "") ? null : duedate;
-
+app.put("/tasks/:id", async (req, res) => {
   try {
-    // Check previous completion
-    const prev = await pool.query('SELECT completed FROM tasks WHERE id=$1', [id]);
-    if (!prev.rows.length) return res.status(404).send("Task not found");
-    const wasCompleted = prev.rows[0].completed;
+    const { id } = req.params;
+    const { name, priority, duedate, completed } = req.body;
 
     const result = await pool.query(
       `UPDATE tasks
        SET name=$1, priority=$2, duedate=$3, completed=$4
        WHERE id=$5
        RETURNING *`,
-      [name, safePriority, safeDueDate, completed, id]
+      [
+        name,
+        priority || "D",
+        duedate || null,
+        completed ?? false,
+        id
+      ]
     );
-
-    // Update gamestate if task was completed
-    if (!wasCompleted && completed) {
-      await pool.query(
-        `UPDATE gamestate
-         SET xp = xp + 10,
-             current_streak = current_streak + 1,
-             total_completed_missions = total_completed_missions + 1,
-             player_progress_percentage = LEAST(player_progress_percentage + 5, 100)
-         WHERE id=$1`,
-        [GAME_STATE_ID]
-      );
-    }
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error updating task:", err);
     res.status(500).send("Error updating task");
   }
 });
 
 // DELETE task
-app.delete('/tasks/:id', async (req, res) => {
-  const { id } = req.params;
-
+app.delete("/tasks/:id", async (req, res) => {
   try {
-    const result = await pool.query('DELETE FROM tasks WHERE id=$1 RETURNING *', [id]);
-    if (!result.rows.length) return res.status(404).send("Task not found");
-
+    await pool.query("DELETE FROM tasks WHERE id=$1", [req.params.id]);
     res.json({ message: "Task deleted" });
   } catch (err) {
-    console.error(err);
+    console.error("❌ Error deleting task:", err);
     res.status(500).send("Error deleting task");
   }
 });
 
-/* ====================== GAME STATE ENDPOINTS ====================== */
+//-----------------GAMESTATE--------------------
 
 // GET gamestate
-app.get('/gamestate', async (req, res) => {
+app.get("/gamestate", async (req, res) => {
   try {
-    const result = await pool.query(
-      'SELECT * FROM gamestate WHERE id=$1',
-      [GAME_STATE_ID]
-    );
+    const result = await pool.query("SELECT * FROM gamestate WHERE id=$1", [GAME_STATE_ID]);
 
     if (!result.rows.length) {
       return res.json({
@@ -137,65 +111,67 @@ app.get('/gamestate', async (req, res) => {
         is_immune: false,
         rewards_state: [],
         shop_items: [],
-        equipped_skin_id: 'default'
+        equipped_skin_id: "default"
       });
     }
 
     res.json(result.rows[0]);
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error fetching game state");
+    console.error("❌ Error fetching gamestate:", err);
+    res.status(500).send("Error fetching gamestate");
   }
 });
 
-// SAVE/UPSERT gamestate
-app.post('/gamestate', async (req, res) => {
-  let {
-    player_progress_percentage,
-    level_index,
-    opponent_index,
-    current_streak,
-    total_completed_missions,
-    xp,
-    level,
-    is_immune,
-    rewards_state,
-    shop_items,
-    equipped_skin_id
-  } = req.body;
-
-  // Default values
-  if (player_progress_percentage === undefined) player_progress_percentage = 50;
-  if (level_index === undefined) level_index = 0;
-  if (opponent_index === undefined) opponent_index = 0;
-  if (current_streak === undefined) current_streak = 0;
-  if (total_completed_missions === undefined) total_completed_missions = 0;
-  if (xp === undefined) xp = 0;
-  if (level === undefined) level = 1;
-  if (is_immune === undefined) is_immune = false;
-  if (!rewards_state) rewards_state = [];
-  if (!shop_items) shop_items = [];
-  if (!equipped_skin_id) equipped_skin_id = 'default';
-
+// SAVE gamestate
+app.post("/gamestate", async (req, res) => {
   try {
+    let {
+      player_progress_percentage,
+      level_index,
+      opponent_index,
+      current_streak,
+      total_completed_missions,
+      xp,
+      level,
+      is_immune,
+      rewards_state,
+      shop_items,
+      equipped_skin_id
+    } = req.body;
+
+    // DEFAULT VALUES
+    player_progress_percentage ??= 50;
+    level_index ??= 0;
+    opponent_index ??= 0;
+    current_streak ??= 0;
+    total_completed_missions ??= 0;
+    xp ??= 0;
+    level ??= 1;
+    is_immune ??= false;
+
+    // ALWAYS SAFE JSON
+    rewards_state = Array.isArray(rewards_state) ? rewards_state : [];
+    shop_items = Array.isArray(shop_items) ? shop_items : [];
+    equipped_skin_id ||= "default";
+
     const result = await pool.query(
       `INSERT INTO gamestate
         (id, player_progress_percentage, level_index, opponent_index, current_streak,
          total_completed_missions, xp, level, is_immune, rewards_state, shop_items, equipped_skin_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11::jsonb,$12)
        ON CONFLICT (id)
        DO UPDATE SET
-         player_progress_percentage = $2,
-         level_index = $3,
-         opponent_index = $4,
-         current_streak = $5,
-         total_completed_missions = $6,
-         xp = $7,
-         level = $8,
-         is_immune = $9,
-         rewards_state = $10,
-         shop_items = $11,
-         equipped_skin_id = $12
+         player_progress_percentage=$2,
+         level_index=$3,
+         opponent_index=$4,
+         current_streak=$5,
+         total_completed_missions=$6,
+         xp=$7,
+         level=$8,
+         is_immune=$9,
+         rewards_state=$10::jsonb,
+         shop_items=$11::jsonb,
+         equipped_skin_id=$12
        RETURNING *`,
       [
         GAME_STATE_ID,
@@ -207,21 +183,24 @@ app.post('/gamestate', async (req, res) => {
         xp,
         level,
         is_immune,
-        rewards_state,
-        shop_items,
+        JSON.stringify(rewards_state),
+        JSON.stringify(shop_items),
         equipped_skin_id
       ]
     );
 
     res.json(result.rows[0]);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).send("Error saving game state");
+    console.error("❌ Error saving gamestate:", err);
+    res.status(500).json({ error: "Error saving gamestate" });
   }
 });
 
-/* START SERVER */
+
+//------------Start Server-------------
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("Server running on port " + PORT);
+  console.log("🔥 Server running on port " + PORT);
 });
+
