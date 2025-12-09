@@ -623,3 +623,145 @@ max-width: calc(100% - 20px);
     width: auto;
 }
 }
+
+/* -------------------------------------------------- */
+/* SHOP BUTTON AND OVERLAY */
+
+/* Shop Button */
+.shop-btn {
+    position: fixed;
+    top: 22px;
+    right: 22px;
+    background: linear-gradient(135deg, #ffb347, #ffcc33);
+    color: #24242c;
+    padding: 10px 16px;
+    border-radius: 50px;
+    font-weight: 700;
+    font-size: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+    z-index: 1000;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.3s ease;
+}
+
+.shop-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    background: linear-gradient(135deg, #ffcc33, #ffb347);
+}
+
+/* Shop Overlay */
+.shop-overlay {
+    position: fixed;
+    top: 70px;                   /* Directly below the button */
+    right: 22px;
+    width: 360px;
+    max-height: 75vh;
+    background: #1e1e2f;
+    color: #fff;
+    padding: 20px;
+    border-radius: 14px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.5);
+    z-index: 1001;
+    transform: translateY(-20px);
+    opacity: 0;
+    transition: transform 300ms ease-out, opacity 300ms ease-out;
+    border: 1px solid rgba(255,255,255,0.1);
+    overflow-y: auto;
+}
+
+/* Active State */
+.shop-overlay.active {
+    transform: translateY(0);
+    opacity: 1;
+}
+
+/* Close Button */
+.shop-overlay .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    color: #fff;
+    border: none;
+    font-size: 16px;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.shop-overlay .close-btn:hover {
+    color: #ffcc33;
+}
+
+/* Shop Overlay Title */
+.shop-overlay .hud-title {
+    font-weight: 800;
+    font-size: 18px;
+    margin-bottom: 12px;
+    color: #ffcc33;
+}
+
+/* Scrollable Shop List */
+.shop-list-scroll {
+    max-height: calc(75vh - 80px);
+    overflow-y: auto;
+    padding-right: 8px;
+}
+
+/* Individual Shop Item */
+.shop-item {
+    padding: 10px 0;
+    border-bottom: 1px dashed rgba(255,255,255,0.15);
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.shop-item:last-child {
+    border-bottom: none;
+}
+
+/* Shop Item Name */
+.shop-name {
+    font-size: 14px;
+    font-weight: 700;
+}
+
+/* Shop Item Button */
+.shop-item button {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: none;
+    background: #ffb347;
+    color: #24242c;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.shop-item button:hover {
+    background: #ffcc33;
+    transform: translateY(-1px);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .shop-btn {
+        top: 10px;
+        right: 10px;
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+
+    .shop-overlay {
+        top: 55px;
+        right: 10px;
+        width: 95%;
+        padding: 16px;
+    }
+
+    .shop-list-scroll {
+        max-height: calc(90vh - 70px);
+    }
+}
