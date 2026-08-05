@@ -29,7 +29,6 @@ This project is a battle style Naruto themed to-do list, combining fiction and r
 
 ## ---- Team Members ----
 
-| Name |
 |---|
 | 🍃Daniya Siddiqui |
 | 🥢Riya Puri |
