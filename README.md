@@ -1,6 +1,6 @@
 # Naruto Themed To Do list 🍃✨
 
-> *One beloved anime + tasks = productivity!.*
+> *One beloved anime + tasks = productivity!*
 
 This project is a battle style Naruto themed to-do list, combining fiction and real life and aiming to help users make completing everyday tasks more fun and exciting!
 
