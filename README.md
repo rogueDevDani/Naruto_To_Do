@@ -9,7 +9,7 @@ This project is a battle style Naruto themed to-do list, combining fiction and r
 <div align="center">
 
 ### Main View
-<img src="" width="420" alt="Main Screen"/>
+<img src="src\assets\main_screen.png" width="420" alt="Main Screen"/>
 
 ### Screenshots
 <img src="" width="420" alt="Added tasks"/>
