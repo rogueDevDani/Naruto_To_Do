@@ -45,7 +45,7 @@
 <div align="center">
 
 
-<div data-importer="techs" align="left">
+<div data-importer="techs" align="center">
   
 ## Main Technologies
   <img src="https://cdn.jsdelivr.net/gh/devicons/devicon/icons/typescript/typescript-original.svg" height="40" alt="typescript logo"  />
