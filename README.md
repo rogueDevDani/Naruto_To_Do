@@ -1,6 +1,6 @@
 # Naruto Themed To Do list 🍃✨
 
-> *One beloved anime + tasks = productivity!.*
+> *One beloved anime + tasks = productivity!*
 
 This project is a battle style Naruto themed to-do list, combining fiction and real life and aiming to help users make completing everyday tasks more fun and exciting!
 
@@ -21,9 +21,10 @@ This project is a battle style Naruto themed to-do list, combining fiction and r
 
 ##  Features
 
-- **Multiple Enemies** — face off against multiple enemies from the beloved anime
+- **Multiple Enemies** — face off against multiple enemies from the beloved anime (10 so far)
+- **Mission rank** — give a priority level to your tasks depending on the ninja rank
 - **Shop** — complete a certain number of tasks to earn point and spend to customize your character
-- **Mission rank** — give a priority level to your tasks depending on the ninja rank 
+- **Rewards** — the more tasks you complete, the more powerups you get to help fight enemies
 
 
 
